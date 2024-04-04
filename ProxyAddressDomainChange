@@ -1,0 +1,22 @@
+# Specify the old and new domain suffixes
+$oldSuffix = "@osage.k12.mo.us"
+$newSuffix = "@osageschools.org"
+
+# Import user information from the CSV file
+$users = Get-ADUser -Filter * -Properties proxyAddresses | Where-Object { $_.proxyAddresses -ne $null }
+
+foreach ($user in $users) {
+    $sam = $user.samaccountname
+    $adUser = Get-ADUser -Filter "SamAccountName -eq '$sam'" -Properties ProxyAddresses
+    if ($adUser) {
+        $proxies = $adUser.ProxyAddresses | ForEach-Object {
+            $_ -replace [regex]::Escape($oldSuffix), $newSuffix
+        } | Sort-Object -Unique
+
+        # $proxies needs to be a strongly typed string array, so cast to [string[]]
+        $adUser | Set-ADUser -Replace @{proxyAddresses = [string[]]$proxies}
+    }
+    else {
+        Write-Warning "Could not find user '$sam'.."
+    }
+}
